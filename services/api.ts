@@ -1,6 +1,34 @@
 import { WaterLog, UserSettings } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// 自动检测 API 地址：如果通过局域网 IP 访问，使用相同的 IP
+const getApiBaseUrl = (): string => {
+    // @ts-ignore - Vite 环境变量
+    const envUrl = import.meta.env.VITE_API_URL;
+    if (envUrl) return envUrl;
+    
+    // 检查是否在 Capacitor 原生环境中
+    const isCapacitor = (window as any).Capacitor?.isNativePlatform();
+    
+    // 获取当前访问的 hostname
+    const hostname = window.location.hostname;
+    
+    // 如果是 localhost 或 127.0.0.1，使用 localhost
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'http://localhost:3001/api';
+    }
+    
+    // 原生 App 中，如果 hostname 是 capacitor://localhost，需要配置服务器地址
+    if (isCapacitor && hostname === 'localhost') {
+        // 在 capacitor.config.ts 中配置 server.url
+        // 或使用环境变量
+        return envUrl || 'http://localhost:3001/api';
+    }
+    
+    // 否则使用相同的 hostname，但端口改为 3001
+    return `http://${hostname}:3001/api`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Get or create a default user ID (in production, this would come from authentication)
 const getUserId = (): string => {

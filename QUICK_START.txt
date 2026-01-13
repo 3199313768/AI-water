@@ -1,0 +1,35 @@
+═══════════════════════════════════════════════════════
+  HydraFlow - 手机端快速安装指南
+═══════════════════════════════════════════════════════
+
+【最简单方法 - PWA 安装】
+
+1. 启动服务（两个终端窗口）：
+   终端1: npm run server
+   终端2: npm run dev
+
+2. 获取电脑 IP：
+   ifconfig | grep "inet " | grep -v 127.0.0.1
+
+3. 手机操作：
+   - 连接同一 WiFi
+   - 浏览器访问: http://你的IP:3000
+   - 菜单 → 添加到主屏幕
+   - 完成！
+
+【生成 APK（原生应用）】
+
+1. 安装 Android Studio: https://developer.android.com/studio
+
+2. 构建 APK：
+   npm run build
+   npm run cap:sync
+   npm run cap:open:android
+
+3. 在 Android Studio 中：
+   Build → Build Bundle(s) / APK(s) → Build APK(s)
+
+4. 安装到手机：
+   传输 APK 文件到手机并安装
+
+详细说明请查看: QUICK_INSTALL.md

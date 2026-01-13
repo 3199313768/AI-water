@@ -1,5 +1,8 @@
 
 import React, { useState, useRef } from 'react';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { Capacitor } from '@capacitor/core';
 import { UserSettings } from '../types';
 
 interface ProfileViewProps {
@@ -25,7 +28,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ settings, onUpdateSettings })
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     let finalValue: any = value;
-    
+
     if (type === 'number' || name === 'dailyGoal' || name === 'weight' || name === 'reminderInterval') {
       finalValue = Number(value);
     }
@@ -53,53 +56,104 @@ const ProfileView: React.FC<ProfileViewProps> = ({ settings, onUpdateSettings })
     }
   };
 
-  const testNotification = () => {
-    // 触发单次震动反馈
-    if ("vibrate" in navigator) {
-      navigator.vibrate(300);
+  const testNotification = async () => {
+    // 使用 Capacitor Haptics 触发震动（移动端）
+    try {
+      await Haptics.impact({ style: ImpactStyle.Medium });
+    } catch (error) {
+      // 如果 Capacitor 不可用，使用 Web API 作为 fallback
+      if ("vibrate" in navigator) {
+        navigator.vibrate(300);
+      }
     }
 
-    if (!("Notification" in window)) {
-      alert("此浏览器不支持桌面通知");
-      return;
-    }
-    Notification.requestPermission().then(permission => {
-      if (permission === "granted") {
+    // 在原生平台使用 Capacitor Local Notifications
+    if (Capacitor.isNativePlatform()) {
+      try {
+        // 检查权限状态
+        const permissionStatus = await LocalNotifications.checkPermissions();
+
+        if (permissionStatus.display === 'granted') {
+          // 权限已授予，直接发送通知
+          await LocalNotifications.schedule({
+            notifications: [
+              {
+                title: "HydraFlow 测试通知",
+                body: "提醒功能已准备就绪，震动已同步！",
+                id: Date.now()
+              }
+            ]
+          });
+        } else {
+          // 请求权限
+          const requestResult = await LocalNotifications.requestPermissions();
+          await LocalNotifications.schedule({
+            notifications: [
+              {
+                title: "HydraFlow 测试通知",
+                body: "提醒功能已准备就绪，震动已同步！",
+                id: Date.now()
+              }
+            ]
+          });
+
+        }
+      } catch (error) {
+        console.error('通知发送失败:', error);
+        alert("通知发送失败，请检查权限设置。");
+      }
+    } else {
+      // Web 平台使用 Web Notification API
+      if (!("Notification" in window)) {
+        alert("此浏览器不支持桌面通知");
+        return;
+      }
+
+      // 检查当前权限状态
+      if (Notification.permission === "granted") {
         new Notification("HydraFlow 测试通知", {
           body: "提醒功能已准备就绪，震动已同步！",
           icon: 'https://cdn-icons-png.flaticon.com/512/3105/3105807.png'
         });
       } else {
-        alert("请授予通知权限以使用提醒功能。");
+        // 请求权限
+        Notification.requestPermission().then(permission => {
+
+          new Notification("HydraFlow 测试通知", {
+            body: "提醒功能已准备就绪，震动已同步！",
+            icon: 'https://cdn-icons-png.flaticon.com/512/3105/3105807.png'
+          });
+
+        });
       }
-    });
+    }
   };
 
   const currentAvatar = tempSettings.avatar || settings.avatar || 'https://picsum.photos/200';
 
   return (
     <div className="px-4 py-4 min-h-screen">
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleFileChange} 
-        accept="image/*" 
-        className="hidden" 
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        className="hidden"
       />
-      
+
       <header className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold tracking-tight dark:text-white">设置与个人资料</h1>
         </div>
         {isEditing ? (
           <div className="flex gap-2">
-            <button 
+            <button
               onClick={handleCancel}
               className="p-2 rounded-xl bg-gray-200 dark:bg-slate-800 text-gray-600 dark:text-gray-400 transition-transform active:scale-90"
             >
               <span className="material-symbols-outlined">close</span>
             </button>
-            <button 
+            <button
               onClick={handleSave}
               className="p-2 rounded-xl bg-primary text-white shadow-lg shadow-primary/20 transition-transform active:scale-90"
             >
@@ -107,7 +161,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ settings, onUpdateSettings })
             </button>
           </div>
         ) : (
-          <button 
+          <button
             onClick={() => setIsEditing(true)}
             className="p-2 rounded-xl bg-primary/10 text-primary transition-transform active:scale-90"
           >
@@ -121,12 +175,12 @@ const ProfileView: React.FC<ProfileViewProps> = ({ settings, onUpdateSettings })
           <div className="flex flex-col items-center gap-4">
             <div className="relative group">
               <div className="w-28 h-28 rounded-full border-4 border-primary/20 p-1 overflow-hidden transition-transform group-hover:scale-105">
-                <div 
-                  className="w-full h-full rounded-full bg-cover bg-center bg-gray-100" 
+                <div
+                  className="w-full h-full rounded-full bg-cover bg-center bg-gray-100"
                   style={{ backgroundImage: `url('${currentAvatar}')` }}
                 ></div>
               </div>
-              <button 
+              <button
                 onClick={handleAvatarClick}
                 className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full border-4 border-white dark:border-slate-900 shadow-md transition-transform hover:scale-110 active:scale-90 cursor-pointer"
                 title="更换头像"
@@ -134,7 +188,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ settings, onUpdateSettings })
                 <span className="material-symbols-outlined text-sm">photo_camera</span>
               </button>
             </div>
-            
+
             <div className="text-center w-full">
               {isEditing ? (
                 <div className="space-y-3">
@@ -234,7 +288,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ settings, onUpdateSettings })
         <section>
           <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1 mb-3">提醒与偏好</h3>
           <div className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 space-y-1 p-2">
-            
+
             {/* 定时提醒开关 */}
             <div className="flex items-center justify-between p-3 rounded-lg hover:bg-background-light dark:hover:bg-gray-800 transition-colors">
               <div className="flex items-center gap-3">
@@ -246,7 +300,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ settings, onUpdateSettings })
                   <p className="text-[10px] text-gray-500">定时发送喝水通知</p>
                 </div>
               </div>
-              <div 
+              <div
                 onClick={() => onUpdateSettings({ remindersEnabled: !settings.remindersEnabled })}
                 className={`w-12 h-6 rounded-full relative p-1 cursor-pointer transition-colors ${settings.remindersEnabled ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'}`}
               >
@@ -262,7 +316,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ settings, onUpdateSettings })
                   <p className="text-sm font-medium dark:text-gray-300">提醒间隔</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <select 
+                  <select
                     value={settings.reminderInterval}
                     onChange={(e) => onUpdateSettings({ reminderInterval: Number(e.target.value) })}
                     className="bg-transparent border-none text-primary font-bold text-sm focus:ring-0 p-0 text-right"
@@ -279,7 +333,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ settings, onUpdateSettings })
             )}
 
             {/* 测试通知按钮 */}
-            <button 
+            <button
               onClick={testNotification}
               className="w-full flex items-center justify-center gap-2 py-2 mt-2 text-xs font-bold text-gray-500 hover:text-primary transition-colors border border-dashed border-gray-200 dark:border-gray-700 rounded-lg"
             >
@@ -297,7 +351,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ settings, onUpdateSettings })
                   <p className="text-[10px] text-gray-500">切换界面外观</p>
                 </div>
               </div>
-              <div 
+              <div
                 onClick={() => onUpdateSettings({ isDarkMode: !settings.isDarkMode })}
                 className={`w-12 h-6 rounded-full relative p-1 cursor-pointer transition-colors ${settings.isDarkMode ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'}`}
               >
